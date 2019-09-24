@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no, width=device-width">
+    <title>test</title>
+    <link rel="stylesheet" href="https://a.amap.com/jsapi_demos/static/demo-center/css/demo-center.css"/> 
+    <style>
+        html,body,#container{
+            margin:0;
+            height:100%;
+        }
+        .input-item-text{
+            width:7rem;
+        }
+    </style>
+</head>
+<body>
+<div id="container"></div>
+<script type="text/javascript" src="https://webapi.amap.com/maps?v=1.4.15&key=779e64976a4b00bfd12e0063273a6479&plugin=AMap.DistrictSearch"></script>
+<script type="text/javascript">
+    //初始化地图对象，加载地图
+    var map = new AMap.Map("container", {
+        resizeEnable: true,
+        center: [116.397428, 39.90923],//地图中心点
+        zoom: 10 //地图显示的缩放级别
+    });
+    //测试数组开始
+	 var colors = [
+        "#3366cc", "#dc3912", "#ff9900", "#109618", "#990099", "#0099c6", "#dd4477", "#66aa00",
+        "#b82e2e", "#316395", "#994499", "#22aa99", "#aaaa11", "#6633cc", "#e67300", "#8b0707",
+        "#651067", "#329262", "#5574a6", "#3b3eac"
+    ];
+	var list=['340100','350100','450200'];
+	//测试结束
+
+
+    var district = null;
+    var polygons=[];
+    function drawBounds() {
+        //加载行政区划插件
+        if(!district){
+            //实例化DistrictSearch
+            var opts = {
+                subdistrict: 0,   //获取边界不需要返回下级行政区
+                extensions: 'all',  //返回行政区边界坐标组等具体信息
+                level: 'district'  //查询行政级别为 市
+            };
+            district = new AMap.DistrictSearch(opts);
+        }
+
+		//具体代码从这里开始
+        //=默认为城市级别=//
+        district.setLevel('city');
+		//循环
+		for(var ii=0;ii<list.length;ii++){
+			var code=list[ii];
+			//let定义颜色，否则会覆盖上次结果
+			let color=colors[ii];
+			//定义根据adcode查询
+			district.search(code, function(status, result) {
+				//map.remove(polygons)//清除上次结果
+				polygons = [];
+				var bounds = result.districtList[0].boundaries;
+				if (bounds) {
+					for (var i = 0, l = bounds.length; i < l; i++) {
+						//生成行政区划polygon
+						var polygon = new AMap.Polygon({
+							strokeWeight: 1,
+							path: bounds[i],
+							fillOpacity: 0.4,
+							fillColor: color,
+							strokeColor: '#0091ea'
+						});
+						polygons.push(polygon);
+					}
+				}
+				map.add(polygons)
+				map.setFitView(polygons);//视口自适应
+			});
+		}
+		
+    }
+    drawBounds();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <base href="http://webapi.amap.com/ui/1.0/ui/geo/DistrictExplorer/examples/" />
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no, width=device-width">
+    <title>行政区</title>
+	 <link rel="stylesheet" type="text/css" href="./area.css">
+</head>
+
+<body>
+	<div id="container" tabindex="0"></div>
+    <script type="text/javascript" src='http://webapi.amap.com/maps?v=1.4.15&key=779e64976a4b00bfd12e0063273a6479'></script>
+    <!-- UI组件库 1.0 -->
+    <script src="http://webapi.amap.com/ui/1.0/main.js?v=1.0.11"></script>
+    <script type="text/javascript">
+    //创建地图
+    var map = new AMap.Map('container', {
+        zoom: 4
+    });
+    //just some colors
+    var colors = [
+        "#3366cc", "#dc3912", "#ff9900", "#109618", "#990099", "#0099c6", "#dd4477", "#66aa00",
+        "#b82e2e", "#316395", "#994499", "#22aa99", "#aaaa11", "#6633cc", "#e67300", "#8b0707",
+        "#651067", "#329262", "#5574a6", "#3b3eac"
+    ];
+	var list=[
+		{
+			adcode:320000,
+			city:[
+				{
+					"adcode": "320100",
+					"name": "南京",
+					"color":"#FF7F00"
+				}, {
+					"adcode": "320300",
+					"name": "徐州",
+					"color":"#EE7AE9"
+				},  {
+					"adcode": "320500",
+					"name": "苏州",
+					"color":"#FF7F00"
+				}, {
+					"adcode": "320600",
+					"name": "南通",
+					"color":"#EE7AE9"
+				}, {
+					"adcode": "320700",
+					"name": "连云港",
+					"color":"#EE7AE9"
+				}, {
+					"adcode": "320800",
+					"name": "淮安",
+					"color":"#EE7AE9"
+				},  {
+					"adcode": "321000",
+					"name": "扬州",
+					"color":"#EE7AE9"
+				}, {
+					"adcode": "321100",
+					"name": "镇江",
+					"color":"#FF7F00"
+				}, {
+					"adcode": "321200",
+					"name": "泰州",
+					"color":"#FF7F00"
+				}
+			]
+		}
+	];
+    AMapUI.load(['ui/geo/DistrictExplorer', 'lib/$'], function(DistrictExplorer, $) {
+
+        //创建一个实例
+        var districtExplorer = window.districtExplorer = new DistrictExplorer({
+            eventSupport: true, //打开事件支持
+            map: map
+        });
+
+        //当前聚焦的区域
+        var currentAreaNode = null;
+
+        //鼠标hover提示内容
+        var $tipMarkerContent = $('<div class="tipMarker top"></div>');
+
+        var tipMarker = new AMap.Marker({
+            content: $tipMarkerContent.get(0),
+            offset: new AMap.Pixel(0, 0),
+            bubble: true
+        });
+
+        //根据Hover状态设置相关样式====鼠标移入显示的自定义内容
+		//可以根据传入的参数不同，查询对应数据
+        function toggleHoverFeature(feature, isHover, position) {
+            tipMarker.setMap(isHover ? map : null);
+            if (!feature) {
+                return;
+            }
+            var props = feature.properties;
+            if (isHover) {
+                //更新提示内容
+                $tipMarkerContent.html(props.adcode + ': ' + props.name+
+										'<div>我自己写的东西1</div>'+
+										'<div>我自己写的东西2</div>'+
+										'<div>我自己写的东西3</div>'+
+										'<div>我自己写的东西4</div>'
+										);
+                //更新位置
+                tipMarker.setPosition(position || props.center);
+            }
+
+            //更新相关多边形的样式
+            var polys = districtExplorer.findFeaturePolygonsByAdcode(props.adcode);
+            for (var i = 0, len = polys.length; i < len; i++) {
+
+                polys[i].setOptions({
+                    fillOpacity: isHover ? 0.5 : 0.2
+                });
+            }
+        }
+
+        //监听feature的hover事件
+        districtExplorer.on('featureMouseout featureMouseover', function(e, feature) {
+            toggleHoverFeature(feature, e.type === 'featureMouseover',
+                e.originalEvent ? e.originalEvent.lnglat : null);
+        });
+
+        //监听鼠标在feature上滑动
+        districtExplorer.on('featureMousemove', function(e, feature) {
+            //更新提示位置
+            tipMarker.setPosition(e.originalEvent.lnglat);
+        });
+
+        //feature被点击
+        districtExplorer.on('featureClick', function(e, feature) {
+            var props = feature.properties;
+
+            //如果存在子节点
+            if (props.childrenNum > 0) {
+                //切换聚焦区域
+				//此处可以根据逻辑查询对应的下级列表，如果有就展示，没有就return
+				if(true){
+					console.log('此处处理绘图逻辑');
+					//switch2AreaNode(props.adcode);
+				}else{
+					return;
+				}
+            }
+        });
+
+        //外部区域被点击
+        districtExplorer.on('outsideClick', function(e) {
+
+            districtExplorer.locatePosition(e.originalEvent.lnglat, function(error, routeFeatures) {
+
+                if (routeFeatures && routeFeatures.length > 1) {
+					console.log(routeFeatures);
+                    switch2AreaNode(routeFeatures[1].properties.adcode);
+                } else {
+                    //切换到全国
+                    switch2AreaNode(100000);
+                }
+
+            }, {
+                levelLimit: 2
+            });
+        });
+
+        //绘制某个区域的边界======绘图主逻辑
+        function renderAreaPolygons(areaNode,citylist) {
+            //更新地图视野
+            map.setBounds(areaNode.getBounds(), null, null, true);
+
+            //清除已有的绘制内容
+//            districtExplorer.clearFeaturePolygons();
+
+            //绘制子区域
+            districtExplorer.renderSubFeatures(areaNode, function(feature, i) {
+				for(var ii=0;ii<citylist.length;ii++){//循环子城市列表
+					var name=feature.properties.name;//取地图查询的所有城市做匹配==即我们自定义的城市必须和地图api查询的城市有对应关系
+					if(citylist[ii].name==format(name)){//如果和数据源匹配，则绘图，否则不做处理
+						let fillColor=citylist[ii].color;
+		                let strokeColor = colors[colors.length - 1 - i % colors.length];
+		               	return {
+							cursor: 'default',
+							bubble: true,
+							strokeColor: strokeColor, //线颜色
+							strokeOpacity: 1, //线透明度
+							strokeWeight: 1, //线宽
+							fillColor: fillColor, //填充色
+							fillOpacity: 0.35, //填充透明度
+						};
+					}
+				}
+            });
+
+            //绘制父区域
+            districtExplorer.renderParentFeature(areaNode, {
+                cursor: 'default',
+                bubble: true,
+                strokeColor: 'black', //线颜色
+                strokeOpacity: 1, //线透明度
+                strokeWeight: 1, //线宽
+                fillColor: null, //填充色
+                fillOpacity: 0.35, //填充透明度
+            });
+        }
+
+        //切换区域后刷新显示内容
+        function refreshAreaNode(areaNode,citylist) {
+            districtExplorer.setHoverFeature(null);
+            renderAreaPolygons(areaNode,citylist);
+        }
+
+        //切换区域
+        function switch2AreaNode(adcode, citylist,callback) {
+			if(!citylist){
+				console.log("没有子城市数据");
+				return;
+			}
+            if (currentAreaNode && ('' + currentAreaNode.getAdcode() === '' + adcode)) {
+                return;
+            }
+            loadAreaNode(adcode, function(error, areaNode) {
+                if (error) {
+                    if (callback) {
+                        callback(error);
+                    }
+                    return;
+                }
+                currentAreaNode = window.currentAreaNode = areaNode;
+                //设置当前使用的定位用节点
+                districtExplorer.setAreaNodesForLocating([currentAreaNode]);
+                refreshAreaNode(areaNode,citylist);
+                if (callback) {
+                    callback(null, areaNode);
+                }
+            });
+        }
+
+        //加载区域
+        function loadAreaNode(adcode, callback) {
+            districtExplorer.loadAreaNode(adcode, function(error, areaNode) {
+                if (error) {
+                    if (callback) {
+                        callback(error);
+                    }
+                    return;
+                }
+                if (callback) {
+                    callback(null, areaNode);
+                }
+            });
+        }
+
+        //全国100000===自定义编码
+		for(var i=0;i<list.length;i++){
+			switch2AreaNode(list[i].adcode,list[i].city);
+		}
+        
+    });
+	//去除默认的区县市
+	function format(a) {
+		if (a.substr(a.length - 1, a.length) == "市"||a.substr(a.length - 1, a.length) == "区") {
+			a = a.substr(0, a.length - 1);
+		}
+		return a;
+	}
+    </script>
+</body>
+
+</html>
